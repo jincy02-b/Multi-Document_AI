@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateFiles } from '../fileValidation'
+import { validateFiles } from './fileValidation'
 
 function file(name: string, size: number, type = 'text/plain'): File {
   return new File([new Uint8Array(size)], name, { type })
