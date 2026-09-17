@@ -44,3 +44,5 @@ th { background: #eef3f8; }
 h3 { margin-top: 28px; }
 .independent { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 10px 0; }
 .independent header { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; }
+.hero-row, .session { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
+.login-form .primary { margin-top: 12px; }

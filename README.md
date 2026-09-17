@@ -13,6 +13,7 @@ The application:
 - Reports discrepancies, missing information, and key-value fields
 - Handles unsupported, unreadable, empty, and invalid files without failing the whole run
 - Lets the user copy the generated output
+- Requires sign-in (username and password from environment variables) before analysis
 
 Stack: **React**, **Node.js**, **TypeScript** (frontend and backend), **MySQL**. Database name: `multi_doc`.
 
@@ -73,6 +74,9 @@ The backend loads `.env` from the repository root (or `backend/.env` if present)
 | `MYSQL_USER` | `root` | MySQL user |
 | `MYSQL_PASSWORD` | *(empty)* | MySQL password |
 | `MYSQL_DATABASE` | `multi_doc` | Database name (created automatically) |
+| `LOGIN_USERNAME` | `analyst` | Workbench sign-in username (backend only) |
+| `LOGIN_PASSWORD` | `ChangeMe!2026` | Workbench sign-in password (backend only) |
+| `SESSION_SECRET` | *(see `.env.example`)* | Signs the httpOnly session cookie. Change this in any shared environment |
 | `MAX_FILES` | `5` | Max files per analysis request |
 | `MAX_FILE_BYTES` | `2097152` | Max size per file (2 MB) |
 | `AI_PROVIDER` | `mock` | `mock` or `openai` |
@@ -80,6 +84,19 @@ The backend loads `.env` from the repository root (or `backend/.env` if present)
 | `OPENAI_MODEL` | `gpt-4o-mini` | Used only when `AI_PROVIDER=openai` |
 
 Leave `AI_PROVIDER=mock` for a full local run with no vendor key.
+
+## Login credentials (project setup)
+
+Sign-in is **not** hard-coded in the frontend. The backend reads `LOGIN_USERNAME`, `LOGIN_PASSWORD`, and `SESSION_SECRET` from `.env`.
+
+Default local values (from `.env.example`):
+
+- Username: `analyst`
+- Password: `ChangeMe!2026`
+
+Change these before any demo that is not on your own machine. Never commit a real password. The UI never receives `LOGIN_PASSWORD` or `SESSION_SECRET`.
+
+After `copy .env.example .env`, edit those three variables, then start the backend so it picks them up.
 
 ## Database setup
 
@@ -121,9 +138,12 @@ npm run dev
 
 | Item | Value |
 |---|---|
-| API | http://localhost:3001 |
-| Health | `GET http://localhost:3001/api/v1/health` |
-| Analyse | `POST http://localhost:3001/api/v1/analyze` (multipart: `files`, `instruction`) |
+| API | http://127.0.0.1:3001 |
+| Health | `GET http://127.0.0.1:3001/api/v1/health` |
+| Analyse | `POST http://127.0.0.1:3001/api/v1/analyze` (multipart: `files`, `instruction`; requires session cookie) |
+| Sign in | `POST http://127.0.0.1:3001/api/v1/auth/login` |
+| Sign out | `POST http://127.0.0.1:3001/api/v1/auth/logout` |
+| Session | `GET http://127.0.0.1:3001/api/v1/auth/me` |
 
 `npm run samples` writes `samples/harbour_credit_licence.pdf` and `samples/corrupt.pdf`.
 
@@ -139,9 +159,11 @@ npm run dev
 | Item | Value |
 |---|---|
 | UI | http://localhost:5173 |
-| API proxy | Vite proxies `/api` to `http://localhost:3001` |
+| API proxy | Vite proxies `/api` to `http://127.0.0.1:3001` |
 
 Keep the backend running in another terminal. The browser only talks to the frontend origin; analysis requests go through the proxy.
+
+The UI shows a **Sign in** screen first. Use `LOGIN_USERNAME` / `LOGIN_PASSWORD` from `.env`. **Sign out** clears the server session and the httpOnly cookie.
 
 ## How to run the complete application from scratch
 
@@ -155,7 +177,7 @@ cd Multi-Document_AI
 copy .env.example .env
 ```
 
-Edit `.env` if your MySQL user or password is not `root` / empty.
+Edit `.env` if your MySQL user or password is not `root` / empty. Also set `LOGIN_USERNAME`, `LOGIN_PASSWORD`, and `SESSION_SECRET` (defaults are listed above).
 
 **2. Confirm MySQL is running** on port 3306.
 
@@ -172,7 +194,7 @@ npm run dev
 Wait until you see:
 
 - `MySQL database 'multi_doc' is ready`
-- `API listening on http://localhost:3001`
+- `API listening on http://127.0.0.1:3001`
 
 `npm run setup:db` is optional if you start the API, because `npm run dev` also creates `multi_doc` and the tables. Running it first makes a failed DB connection obvious before the UI starts.
 
@@ -186,7 +208,11 @@ npm run dev
 
 Open http://localhost:5173.
 
-**5. Run an analysis**
+**5. Sign in**
+
+Use the credentials from `.env` (default `analyst` / `ChangeMe!2026`). A successful login sets an httpOnly session cookie. Analysis routes reject unauthenticated requests.
+
+**6. Run an analysis**
 
 1. Upload two or more files from `samples/` (for example `aurora_lending_application.txt`, `aurora_financials.csv`, `harbour_credit_licence.pdf`).
 2. Optionally include `empty.txt` or `corrupt.pdf` to see graceful failure.
@@ -194,12 +220,14 @@ Open http://localhost:5173.
 4. Click **Run analysis**.
 5. Review summary, comparison table, discrepancies, missing information, key-values, and independent per-document findings.
 6. Click **Copy output**.
+7. Click **Sign out** when finished.
 
 ## Architecture
 
 ```
 Browser (React)
-    → POST /api/v1/analyze
+    → POST /api/v1/auth/login  (env credentials, httpOnly signed cookie)
+    → POST /api/v1/analyze     (session required)
         → validate instruction and files
         → extract each document independently (PDF / CSV / TXT)
         → AnalysisProvider (mock by default, OpenAI optional)
@@ -207,6 +235,7 @@ Browser (React)
             → collective comparison
         → persist metadata + result JSON in MySQL (multi_doc)
     → structured result envelope { data, error, meta }
+    → POST /api/v1/auth/logout
 ```
 
 Design choices:
@@ -222,6 +251,7 @@ Out of scope for this assessment: RAG, vector databases, Docker, Kubernetes, Red
 ## Completed functionality
 
 - Multiple-file upload with PDF, CSV, and TXT support
+- Basic login / logout with environment-variable credentials and httpOnly sessions
 - File validation: count, size, extension, MIME, empty/corrupt/unsupported handling
 - User-defined analysis instruction (treated as untrusted input)
 - Independent document analysis and collective comparison
@@ -236,7 +266,7 @@ Out of scope for this assessment: RAG, vector databases, Docker, Kubernetes, Red
 
 ## Assumptions
 
-- A demo `x-user-id` header (default `demo-user`) is enough for this assessment; it is not a full identity platform.
+- A single env-configured workbench user is enough for this assessment; it is not SSO or multi-tenant IAM.
 - In-memory upload processing is appropriate for the 2 MB × 5 file limit.
 - A deterministic mock extractor is acceptable when no LLM key is provided.
 - Sample names, addresses, licences, revenue, and obligations are fictional.
@@ -249,13 +279,17 @@ Out of scope for this assessment: RAG, vector databases, Docker, Kubernetes, Red
 - Rate limiting is in-process (lost on process restart; not Redis).
 - Analysis runs inside the HTTP request; there is no job queue.
 - Optional OpenAI path needs a key and is not required for the demo.
-- Demo user scoping is not SSO / case-level authorisation.
+- Demo login is a single env user, not SSO / case-level authorisation.
+- Login password is compared from `.env` (not a password-hash user store).
 
 ## Security considerations
 
-- API keys and database credentials stay on the backend and in `.env` (gitignored).
-- Parameterized MySQL queries; analysis reads are scoped by `id` and `user_id`.
-- CORS is an explicit frontend origin, not `*`.
+- API keys, database credentials, and login credentials stay on the backend and in `.env` (gitignored).
+- Login uses Zod validation, generic failure messages, timing-safe credential compare, login rate limits, and no password in responses.
+- Sessions are random ids in signed **httpOnly** cookies (`SameSite=lax`, `Secure` in production). Analysis APIs require that session. The client cannot set `user_id`.
+- Parameterized MySQL queries; analysis reads are scoped by `id` and `user_id` (the signed-in username).
+- CORS is an explicit frontend origin with credentials, not `*`.
+- Security headers: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`; `X-Powered-By` disabled.
 - Upload allowlist, payload size limits, and in-memory multipart handling.
 - Generic client error messages; details stay in server logs.
 - User instructions and document text are untrusted. The mock does not follow override-like language in the instruction.
@@ -267,7 +301,7 @@ Out of scope for this assessment: RAG, vector databases, Docker, Kubernetes, Red
 
 ### Backend
 
-Node.js test runner. Covers independent/collective analysis with source ids, upload validation, extractors, and the `/api/v1/analyze` error envelope.
+Node.js test runner. Covers independent/collective analysis with source ids, upload validation, extractors, login/logout, and authz on `/api/v1/analyze`.
 
 ```powershell
 cd backend
@@ -276,7 +310,7 @@ npm test
 
 ### Frontend
 
-Vitest + React Testing Library. Covers file validation, copyable output, results rendering (comparison, discrepancies, provenance, fact vs interpretation), and the submit guard.
+Vitest + React Testing Library. Covers file validation, login field checks, copyable output, results rendering (comparison, discrepancies, provenance, fact vs interpretation), and the submit guard.
 
 ```powershell
 cd frontend

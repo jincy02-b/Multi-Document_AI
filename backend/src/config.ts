@@ -26,5 +26,12 @@ export const config = {
     openaiKey: process.env.OPENAI_API_KEY ?? '',
     openaiModel: process.env.OPENAI_MODEL ?? 'gpt-4o-mini',
   },
+  auth: {
+    username: process.env.LOGIN_USERNAME ?? 'analyst',
+    password: process.env.LOGIN_PASSWORD ?? 'ChangeMe!2026',
+    sessionSecret: process.env.SESSION_SECRET ?? 'dev-only-change-me-use-at-least-32-chars',
+    sessionTtlMs: 8 * 60 * 60 * 1000,
+    cookieName: 'mdiw_sid',
+  },
   contentLimitChars: 20_000,
 }

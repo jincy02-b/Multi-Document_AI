@@ -6,8 +6,10 @@ import { analyzeDocuments } from '../services/analysisService.ts'
 import { getAnalysisForUser } from '../db/analysesRepo.ts'
 import { sanitizeInstruction } from '../validation/files.ts'
 import { analyzeRateLimit } from '../middleware/rateLimit.ts'
+import { requireAuth } from '../middleware/requireAuth.ts'
 import { AppError } from '../util/errors.ts'
 import { ERROR_CODES, type ApiEnvelope, type AnalyzeResult } from '../../../shared/types.ts'
+import { authRouter } from './auth.ts'
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -18,6 +20,8 @@ const upload = multer({
 })
 
 export const apiRouter = Router()
+
+apiRouter.use('/auth', authRouter)
 
 apiRouter.get('/health', (_req, res) => {
   const body: ApiEnvelope<{ ok: true; database: string }> = {
@@ -30,6 +34,7 @@ apiRouter.get('/health', (_req, res) => {
 
 apiRouter.post(
   '/analyze',
+  requireAuth,
   analyzeRateLimit,
   upload.array('files', config.upload.maxFiles),
   async (req, res, next) => {
@@ -43,7 +48,10 @@ apiRouter.post(
       }
 
       const instruction = sanitizeInstruction(req.body?.instruction)
-      const userId = req.userId ?? 'demo-user'
+      const userId = req.userId
+      if (!userId) {
+        throw new AppError(ERROR_CODES.UNAUTHORIZED, 'Please sign in', 401)
+      }
       const data = await analyzeDocuments({ userId, instruction, files })
       const body: ApiEnvelope<AnalyzeResult> = {
         data,
@@ -57,10 +65,14 @@ apiRouter.post(
   },
 )
 
-apiRouter.get('/analyses/:id', async (req, res, next) => {
+apiRouter.get('/analyses/:id', requireAuth, async (req, res, next) => {
   try {
     const id = z.string().uuid().parse(req.params.id)
-    const data = await getAnalysisForUser(id, req.userId ?? 'demo-user')
+    const userId = req.userId
+    if (!userId) {
+      throw new AppError(ERROR_CODES.UNAUTHORIZED, 'Please sign in', 401)
+    }
+    const data = await getAnalysisForUser(id, userId)
     if (!data) {
       throw new AppError(ERROR_CODES.VALIDATION_ERROR, 'Analysis not found', 404)
     }

@@ -34,6 +34,16 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     return
   }
 
+  if (err instanceof SyntaxError) {
+    const body: ApiEnvelope<null> = {
+      data: null,
+      error: { code: ERROR_CODES.VALIDATION_ERROR, message: 'Invalid request' },
+      meta: { requestId },
+    }
+    res.status(400).json(body)
+    return
+  }
+
   console.error('Unhandled error', { requestId, err })
   const body: ApiEnvelope<null> = {
     data: null,

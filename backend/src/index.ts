@@ -12,7 +12,7 @@ try {
   process.exit(1)
 }
 
-app.listen(config.port, () => {
-  console.log(`API listening on http://localhost:${config.port}`)
+app.listen(config.port, '127.0.0.1', () => {
+  console.log(`API listening on http://127.0.0.1:${config.port}`)
 })
 
