@@ -250,19 +250,42 @@ Out of scope for this assessment: RAG, vector databases, Docker, Kubernetes, Red
 
 ## Completed functionality
 
-- Multiple-file upload with PDF, CSV, and TXT support
-- Basic login / logout with environment-variable credentials and httpOnly sessions
-- File validation: count, size, extension, MIME, empty/corrupt/unsupported handling
-- User-defined analysis instruction (treated as untrusted input)
-- Independent document analysis and collective comparison
-- Structured output: consolidated summary, comparison table, discrepancy list, missing-information report, key-value extraction
-- Source document indicated on each finding
-- Facts labelled separately from interpretation
+The brief is covered:
+
+- Multiple-file upload with at least two formats (this repo supports **PDF, CSV, and TXT**)
+- Extract/ingest per document
+- User-defined analysis instruction
+- Independent and collective analysis without merging documents into one prompt
+- Structured comparison table, consolidated summary, discrepancies, missing-information report, and key-value extraction
+- Source document on every finding
 - Copyable generated output
-- Frontend/backend separation with TypeScript on both sides
-- MySQL persistence of analysis JSON and document metadata
-- Pluggable mock AI (optional OpenAI path)
-- Automated tests on frontend and backend
+- Graceful handling of unsupported, unreadable, empty, and invalid files
+- Synthetic sample documents only
+- TypeScript frontend and backend, MySQL, modular extractors, mock (or optional LLM) analysis, provenance, validation, and tests
+
+## Additional features (beyond the assessment brief)
+
+These are **not required** by the 60-minute specification. They were added on top of a working workbench.
+
+| Additional feature | Why it is extra |
+|---|---|
+| **Sign-in and sign-out** | The brief does not ask for authentication. The app uses `LOGIN_USERNAME` / `LOGIN_PASSWORD` from `.env`, a signed httpOnly session cookie, and rejects unauthenticated `/analyze` calls. |
+| **Session security extras** | Timing-safe credential compare, generic login errors, login rate limit, `SameSite` cookie, `Secure` in production, security response headers. |
+| **Automatic MySQL bootstrap** | The brief only needs a schema/seed where applicable. On start the API creates database `multi_doc` and tables without a manual SQL step. |
+| **Three document formats** | The brief requires at least two. PDF, CSV, and TXT are all implemented. |
+| **All result views at once** | The brief allows *one or more* output types. The UI always shows summary, comparison table, discrepancies, missing information, key-values, **and** a per-document independent analysis panel. |
+| **Example instruction chips** | Clickable sample prompts in the UI (the brief only requires a user-defined instruction). |
+| **Optional OpenAI provider** | A mock AI satisfies the brief. `AnalysisProvider` can be switched to OpenAI via `AI_PROVIDER` without changing the pipeline. |
+| **Health and saved-analysis APIs** | `GET /api/v1/health` and `GET /api/v1/analyses/:id` (owner-scoped) are extra operational endpoints. |
+| **Analyse rate limiting** | In-process limit on analysis requests, in addition to login throttling. |
+| **Shared API types + envelope** | `shared/` TypeScript contracts and `{ data, error, meta }` on every response. |
+| **Large-content truncation flag** | Extracted text is capped; the UI marks truncated documents. |
+| **React error boundary** | Unexpected UI failures show a safe message instead of a blank page. |
+| **Frontend and backend test suites** | The brief requires *at least one* meaningful test. This repo has backend tests (pipeline, auth, API) and frontend tests (validation, results, copy output). |
+| **Corrupt/empty sample files** | `empty.txt` and `corrupt.pdf` exist specifically to demonstrate graceful failure. |
+| **Cursor project rules** | `.cursor/rules` encode engineering constraints for the coding agent; not part of the product brief. |
+
+Login, CORS, rate limits, and env-based credentials are therefore **additional**. The core upload → extract → analyse → structured, sourced results flow is what the assessment asked for.
 
 ## Assumptions
 
@@ -354,7 +377,7 @@ Example instructions:
 
 ## Productionisation approach
 
-- Replace `x-user-id` with real authentication and per-case authorisation.
+- Replace the demo env-user login with real authentication and per-case authorisation.
 - Point `AnalysisProvider` at a production LLM; keep structured-output validation.
 - Store uploads in encrypted object storage with malware scanning and retention/deletion.
 - Use a secret manager for MySQL and provider credentials.
@@ -376,6 +399,7 @@ Architectural and implementation decisions made by the candidate include:
 - Shared TypeScript types as the API contract
 - Persist structured results and metadata only, not original bytes
 - Automatic MySQL `multi_doc` bootstrap instead of a manual SQL step
+- Login/session, rate limits, and extra tests were added beyond the written brief (see **Additional features**)
 
 ## Clear commit history
 
