@@ -1,0 +1,50 @@
+---
+description: Node.js + TypeScript backend structure, async processing, MySQL access, and pipeline modules
+globs: backend/**/*.ts
+alwaysApply: false
+---
+
+# Node.js
+
+Backend is TypeScript-only. Keep HTTP, document processing, AI, and persistence in separate modules.
+
+## Layers
+
+```
+routes → services → (extractors | ai | db)
+```
+
+- Routes: parse request, call service, return envelope. No business logic.
+- Services: orchestrate upload, independent analysis, collective analysis.
+- Extractors: PDF / CSV / TXT adapters behind one `DocumentExtractor` interface.
+- DB: parameterized queries/ORM only, scoped by `user_id`.
+
+## Async and load
+
+- Extraction and AI calls are async. Bound concurrency. Use timeouts.
+- For large content, chunk or summarize per document; never dump entire corpora into one prompt.
+- Use transactions when inserting a document plus extracted records together.
+
+```typescript
+// ❌ BAD
+app.post('/analyze', async (req, res) => {
+  const text = fs.readFileSync(req.file.path, 'utf8')
+  res.json(await openai.complete(text))
+})
+
+// ✅ GOOD
+export async function analyzeDocuments(userId: string, input: AnalyzeInput): Promise<AnalyzeResult> {
+  const processed = await processEachDocument(input.files) // per-file try/catch
+  return consolidate(processed, input.instruction)
+}
+```
+
+## Config
+
+- Read secrets from env (`process.env`), validated at startup.
+- Do not store original document bytes in MySQL unless required; store metadata + storage key + extracted structured data.
+- Clean up temp files in `finally` blocks.
+
+## Tests
+
+Cover at least one meaningful path: invalid upload rejection, extractor contract, or analysis result shape with source citations.

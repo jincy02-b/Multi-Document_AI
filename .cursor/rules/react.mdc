@@ -1,0 +1,47 @@
+---
+description: React + TypeScript UI patterns for upload, analysis instructions, results, and copyable output
+globs: frontend/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# React
+
+Use functional components and TypeScript props. Keep UI free of secrets, AI keys, and direct DB access. Call the backend only through typed API clients.
+
+## Structure
+
+- Pages compose features; features own hooks; hooks call the API client.
+- Colocate component-specific types. Shared analysis types come from `shared/`.
+- Extract reusable hooks for upload, analysis job polling, and clipboard copy.
+
+## Upload and analysis UI
+
+- Support multiple files. Enforce client-side allowlist, count, and size limits, then rely on the server as source of truth.
+- Collect a user-defined analysis instruction; send it as data, never as a trusted system prompt.
+- Show per-file status (pending, processed, unsupported, unreadable, empty, failed).
+- Disable submit while an analysis request is in flight; surface timeouts and rate-limit errors clearly.
+
+## Results
+
+Render backend payloads without inventing fields. Required views:
+
+- Consolidated summary
+- Structured comparison table
+- Discrepancy list
+- Missing-information report
+- Key-value extraction
+
+Every finding must show its source document. Visually distinguish **extracted facts** from **AI interpretation**. Indicate missing or unreadable values explicitly.
+
+```tsx
+// ❌ BAD
+<pre>{JSON.stringify(result)}</pre>
+
+// ✅ GOOD
+<FindingRow fact={finding.fact} source={finding.sourceDocumentId} kind={finding.kind} />
+```
+
+## Copy and errors
+
+- Provide a single control that copies the generated output (summary + tables + discrepancies + missing info) as plain text.
+- Error boundaries for unexpected UI failures. Never display raw exception objects or backend stack traces.

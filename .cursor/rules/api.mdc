@@ -1,0 +1,48 @@
+---
+description: HTTP API contracts, authz, CORS, rate limits, payload validation, and safe responses
+globs: backend/src/routes/**/*.ts,backend/src/middleware/**/*.ts,backend/src/api/**/*.ts,shared/**/*.ts
+alwaysApply: false
+---
+
+# API
+
+All public HTTP APIs live on the backend. Frontend never talks to MySQL or the LLM provider.
+
+## Contracts
+
+- Prefix: `/api/v1`.
+- Envelope: `{ data, error, meta }` where `error` is `{ code, message }` or null.
+- Typed DTOs in `shared/` for upload, analyze, findings, discrepancies, and missing fields.
+
+Required analysis capabilities (may be one job with stages):
+
+- Independent per-document analysis
+- Collective/comparison analysis
+- Structured findings with `sourceDocumentId` on every item
+
+## Validation and abuse
+
+- Validate body, query, params, and multipart with a schema (Zod).
+- Limit JSON payload size and multipart size independently.
+- Allowlist `Content-Type`. Reject unexpected fields on strict schemas.
+- Rate-limit `/upload` and `/analyze` per user/IP.
+- CORS: explicit origin allowlist, credentials only if required, no `*`.
+
+## Auth and data exposure
+
+- Every document route authorizes ownership before read/write.
+- Responses include ids, filenames, statuses, and structured findings — not raw file bytes, secrets, or full unredacted dumps by default.
+- Prompt-like user instructions are stored/transmitted as plain user input, not as privileged policy.
+
+```typescript
+// ❌ BAD
+res.json({ sql, apiKey, stack, filePath })
+
+// ✅ GOOD
+res.status(400).json({ data: null, error: { code: 'VALIDATION_ERROR', message: 'Invalid upload' }, meta: { requestId } })
+```
+
+## Files over HTTP
+
+- Multipart only on upload endpoints. Validate count, size, extension, and MIME before any parse/AI call.
+- Do not accept remote URLs for documents unless explicitly designed and sandboxed.

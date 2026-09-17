@@ -1,0 +1,42 @@
+---
+description: Centralized error handling, input validation, partial failures, and safe client-facing messages
+alwaysApply: true
+---
+
+# Error Handling and Validation
+
+## Validation
+
+- Validate at the boundary (HTTP handler / form submit) and again before persistence or AI calls.
+- Use a shared schema library (e.g. Zod) for request bodies, query params, and AI structured output.
+- Fail closed: invalid, unsupported, empty, or unreadable input is rejected or recorded as a document-level error — never analyzed as success.
+
+```typescript
+// ❌ BAD
+const instruction = req.body.instruction
+
+// ✅ GOOD
+const parsed = AnalyzeRequestSchema.safeParse(req.body)
+if (!parsed.success) {
+  throw new AppError('VALIDATION_ERROR', 'Invalid analysis request', 400, parsed.error.flatten())
+}
+```
+
+## Errors
+
+- Use a typed `AppError` (code, safe message, HTTP status, optional details).
+- Centralize mapping to `{ error: { code, message } }`. Do not leak internals.
+- Log `cause`, request id, and document id on the server only.
+
+## Partial and graceful failure
+
+- Continue processing remaining files when one upload/extract/AI call fails.
+- Return per-document status: `processed | unsupported | unreadable | empty | invalid | failed`.
+- If AI analysis cannot complete, return extracted facts (if any) plus a clear analysis-unavailable error. Do not fabricate results.
+
+## Domain reporting
+
+- Missing fields → missing-information report, not guessed values.
+- Conflicting values → discrepancy list with each source document cited.
+- Unreadable/corrupt files → explicit document error, keep original filename/identity.
+- Frontend must show these states and still allow copy of whatever valid output exists.

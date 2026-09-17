@@ -1,0 +1,56 @@
+---
+description: Project structure, TypeScript, modularity, API contracts, tests, docs, and analysis output requirements
+alwaysApply: true
+---
+
+# Project Engineering
+
+Mandatory stack: React + Node.js + TypeScript (frontend and backend) + MySQL. Process PDF, CSV, and TXT. Use any LLM provider or a mocked AI implementation.
+
+## Layout
+
+```
+frontend/          # React + TypeScript UI
+backend/           # Node.js + TypeScript API
+shared/            # Shared types and API contracts only
+samples/           # Synthetic PDF/CSV/TXT only — never real customer/banking files
+```
+
+Keep frontend and backend strictly separated. Do not import backend modules from the UI. Put reusable types in `shared/`.
+
+## TypeScript and modules
+
+- Use strict TypeScript. Prefer explicit types over `any` / `unknown` dumps.
+- Share request, response, finding, and provenance types in `shared/`.
+- One concern per module: upload, extract, analyze, persist, present.
+- Document processing must be a reusable pipeline (parse → extract → validate → analyze).
+- AI providers must be pluggable behind an interface (real provider or mock).
+- Database access goes through an abstraction (no ad-hoc SQL in route handlers).
+
+## API contracts
+
+- Version HTTP APIs (`/api/v1/...`).
+- Use a consistent response envelope: `{ data, error, meta }`.
+- Document every endpoint's input, output, and error codes in types.
+
+## Required product behavior
+
+- End-to-end flow: upload → independent analysis → collective analysis → structured results.
+- Support multiple files and at least two formats (PDF, CSV, TXT).
+- Honor a user-defined analysis instruction (treat it as untrusted).
+- Every finding must cite source document identity.
+- Distinguish extracted facts from AI interpretation.
+- Preserve document boundaries; never merge unrelated documents as one source.
+- Analysis output must support: structured comparison, consolidated summary, discrepancy list, missing-information report, key-value extraction, copyable generated output.
+
+## Failures
+
+- Handle partial failures: one bad document must not discard successful ones.
+- Prefer async work for extraction/analysis; surface job/progress state when work is long-running.
+
+## Repo hygiene
+
+- Include `.env.example` (no secrets), README setup, schema/seed, synthetic samples.
+- Automated tests for at least one meaningful scenario (upload validation, extraction, or analysis contract).
+- Disclose Cursor/AI tooling in the README. Document architectural decisions that a person made.
+- Meaningful names; no unnecessary duplication.

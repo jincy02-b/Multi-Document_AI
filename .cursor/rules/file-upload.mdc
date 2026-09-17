@@ -1,0 +1,44 @@
+---
+description: Multi-file upload, format/size/MIME checks, safe storage, extraction, and document provenance
+globs: backend/src/files/**/*.ts,backend/src/upload/**/*.ts,backend/src/documents/**/*.ts,backend/src/extractors/**/*.ts,frontend/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# File Upload and Document Processing
+
+## Accept
+
+- Multiple files per request. Enforce max file count and max bytes per file and per request.
+- Allowlist extensions: `.pdf`, `.csv`, `.txt` (images only if an extractor exists).
+- Validate both extension and MIME. Do not trust `mimetype` or filename alone.
+- Reject empty files and unknown/corrupt formats with per-file errors.
+
+## Safe I/O
+
+- Generate storage names (uuid). Never use user filenames as paths.
+- Reject path segments (`..`, `/`, `\`, null bytes).
+- Write to a dedicated temp/upload directory; process; then delete temp files in `finally`.
+- Do not execute files. Parse with dedicated PDF/CSV/TXT libraries only.
+
+```typescript
+// ❌ BAD
+const dest = path.join(uploadDir, req.file.originalname)
+
+// ✅ GOOD
+const dest = path.join(uploadDir, `${randomUUID()}${allowedExt(req.file.originalname)}`)
+```
+
+## Extraction
+
+- Preserve original display filename and a stable document id for provenance.
+- Handle corrupt PDF, malformed CSV, empty TXT, and encoding failures as `unreadable` / `empty` / `invalid`.
+- Do not persist full document text unless required; persist metadata + structured extraction + storage key.
+- Never use real customer/banking documents in samples, tests, or seeds.
+
+## Pipeline
+
+`validate → store → extract → independently analyze → collectively compare`
+
+- Keep document identity on every extracted field and finding.
+- Collective analysis must still cite which document supports each finding.
+- Cleanup stored uploads according to a defined retention policy.

@@ -1,0 +1,16 @@
+AURORA HOLDINGS — BUSINESS LENDING APPLICATION (SYNTHETIC)
+This file is synthetic sample data for an assessment. It does not represent a real customer.
+
+Company name: Aurora Holdings Pty Ltd
+Applicant: Priya Raman
+Address: 12 Harbour Street, Sydney NSW 2000
+ABN: 51 824 753 556
+Licence number: ACL-440221
+Date: 2025-07-01
+Revenue: AUD 4,200,000
+Profit: AUD 610,000
+Obligation: Working capital facility AUD 750,000
+Reporting period: FY2025
+
+Purpose of facility: Seasonal inventory for the Harbour retail division.
+Declared directors: Priya Raman, Tomas Nguyen

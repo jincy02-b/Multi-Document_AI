@@ -1,0 +1,49 @@
+---
+description: Backend LLM/mock AI provider usage, structured output, limits, provenance, and prompt-injection safety
+globs: backend/src/ai/**/*.ts,backend/src/providers/**/*.ts,backend/src/analysis/**/*.ts
+alwaysApply: false
+---
+
+# AI API Handling
+
+AI runs only on the backend. Keys stay in env. The frontend receives validated structured results, never provider credentials or raw provider payloads by default.
+
+## Provider abstraction
+
+```typescript
+interface AnalysisProvider {
+  analyze(input: ProviderAnalyzeInput): Promise<ProviderAnalyzeOutput>
+}
+```
+
+Implement at least one real provider **or** a deterministic mock. Application code depends on the interface, not a vendor SDK.
+
+## Requests
+
+- Send one document (or clearly delimited document blocks) per independent analysis.
+- Preserve document id, filename, and locator in the prompt context as data, not as executable instructions.
+- Treat user instructions and extracted text as untrusted. Put policy in the system prompt; put user/document text in clearly marked sections.
+- Bound tokens/context: truncate or chunk large documents; record that truncation occurred.
+
+## Responses
+
+- Require structured output (JSON schema). Validate with Zod before use.
+- On malformed JSON, retry once if safe, then fail that document/analysis with a typed error.
+- Handle timeouts, 429 rate limits, and provider 5xx with backoff and a user-safe failure status.
+- Never convert a failed AI call into guessed financial conclusions.
+
+```typescript
+// ❌ BAD
+const text = await provider.complete(userInstruction + documentText)
+return { summary: text }
+
+// ✅ GOOD
+const output = AnalyzeOutputSchema.safeParse(await provider.analyze(boundedInput))
+if (!output.success) throw new AppError('AI_OUTPUT_INVALID', 'Analysis output was unusable', 502)
+```
+
+## Facts vs interpretation
+
+- Schema must separate `extractedFacts` from `interpretations`.
+- Each item needs `sourceDocumentId` and a locator (page, row, field).
+- If the model cannot support a claim, omit it and add a missing-information or limitation entry instead.
